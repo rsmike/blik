@@ -47,8 +47,38 @@ final class OverlayController {
     private var token = 0
     /// A toast that arrived while another was playing. Toasts never overlap: it plays next.
     private var waiting: ToastSpec?
+    /// The rest card, while a break is up.
+    private weak var restCard: KeyPanel?
 
-    private init() {}
+    private init() {
+        // Locking the screen, the screen saver and sleep all take the keyboard away from the
+        // rest card, and nothing hands it back. A break is often sat out away from the Mac, so
+        // the card takes the keyboard again when the user returns.
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.sessionDidBecomeActiveNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.didWakeNotification] {
+            workspace.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in OverlayController.shared.userReturned() }
+            }
+        }
+        let system = DistributedNotificationCenter.default()
+        for name in ["com.apple.screenIsUnlocked", "com.apple.screensaver.didstop"] {
+            system.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { _ in
+                Task { @MainActor in OverlayController.shared.userReturned() }
+            }
+        }
+    }
+
+    /// The screen has just been unlocked or woken. The system is still putting windows back at
+    /// that moment, so the card asks for the keyboard a little later, and once more after that.
+    private func userReturned() {
+        for delay in [0.3, 1.5] {
+            after(delay) { [weak self] in
+                guard let self = self, self.showing == .rest, let card = self.restCard else { return }
+                card.orderFrontRegardless()
+                card.makeKey()
+            }
+        }
+    }
 
     /// Something is on screen, or about to be.
     var isShowing: Bool { showing != nil || waiting != nil }
@@ -140,6 +170,7 @@ final class OverlayController {
         // Enter, space and esc answer the break, so the card takes the keyboard while it is up.
         panel.makeKey()
         panels.append(panel)
+        restCard = panel
     }
 
     /// Takes down whatever is on screen (done, snooze, pause). A toast that was waiting plays now.
@@ -156,6 +187,7 @@ final class OverlayController {
 
     private func takeDown(animated: Bool) {
         showing = nil
+        restCard = nil
         guard !panels.isEmpty else { return }
         token += 1
         let closing = panels
