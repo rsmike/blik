@@ -49,15 +49,7 @@ struct SettingsView: View {
 
     private var options: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Style", selection: $settings.theme) {
-                ForEach(Theme.allCases) { theme in
-                    Text(verbatim: theme.title).tag(theme)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            optionRow("Dim screen during reminders", isOn: $settings.dimScreen)
+            optionRow("Dim screen during rest breaks", isOn: $settings.dimScreen)
             optionRow("Launch at login", isOn: launchBinding)
         }
     }

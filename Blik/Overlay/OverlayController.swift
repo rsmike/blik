@@ -28,24 +28,24 @@ final class OverlayController {
 
         let screens = NSScreen.screens
         guard !screens.isEmpty else { return }
-        // The system's primary display (the one set as main in Displays settings) is always first.
-        let primary = screens[0]
-
         let settings = AppSettings.shared
-        let theme = settings.theme
-        let message = kind.randomMessage()
+
+        // Reminders drop from the notch, so the content goes on the display that has one. Failing
+        // that, on the system primary display (the one set as main in Displays settings, always first).
+        let primary = screens.first(where: NotchAnchor.hasNotch) ?? screens[0]
+        // A quick reminder lives on its own display and never dims anything.
+        let toast = kind != .rest
 
         token += 1
         let current = token
         isShowing = true
 
-        for screen in screens {
+        for screen in toast ? [primary] : screens {
             let scene = ReminderScene(
                 kind: kind,
-                theme: theme,
-                dimmed: settings.dimScreen,
+                dimmed: settings.dimScreen && !toast,
                 isPrimary: screen === primary,
-                message: message
+                anchor: NotchAnchor(screen: screen)
             )
             let host = NSHostingView(rootView: scene)
             host.sizingOptions = []
@@ -64,7 +64,7 @@ final class OverlayController {
                 width: size.width,
                 height: size.height
             )
-            let button = SkipButton(theme: theme) { [weak self] in
+            let button = SkipButton { [weak self] in
                 self?.dismiss(animated: true)
             }
             let host = ClickableHostingView(rootView: button)

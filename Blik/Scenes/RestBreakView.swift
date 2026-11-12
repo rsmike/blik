@@ -1,30 +1,25 @@
 import SwiftUI
 
 /// The long break: look away, eye gymnastics (follow the dot), then a glass of water.
-/// Styled by the active theme; timing lives in `RestTimeline`.
+/// Timing lives in `RestTimeline`.
 struct RestBreakView: View {
-    let theme: Theme
     let dimmed: Bool
     let isPrimary: Bool
+    let anchor: NotchAnchor
 
     @State private var start = Date()
 
     private let total = RestTimeline.total
-    private var accent: Color { theme.accent }
+    private let accent = Color.white
+    private var veil: Double { dimmed ? 0.8 : 0 }
+    /// The content waits for the drop to land and start spreading.
+    private let contentStart = NotchRestBackdrop.lands + 0.3
 
     var body: some View {
         ZStack {
-            // The backdrop runs at 30 fps; the content (and the dot you follow) at full frame rate.
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            TimelineView(.animation) { timeline in
                 let t = timeline.date.timeIntervalSince(start)
-                // Matrix rain is turned down so it does not fight the exercise for attention.
-                let gain = theme == .matrix ? 0.5 : 1.0
-                ThemeBackdrop(
-                    theme: theme,
-                    t: t,
-                    strength: envelope(t, 0, total, fade: 0.9) * gain,
-                    veil: (dimmed ? 0.8 : 0) / gain
-                )
+                NotchRestBackdrop(anchor: anchor, isPrimary: isPrimary, t: t, total: total, veil: veil)
             }
             if isPrimary {
                 TimelineView(.animation) { timeline in
@@ -32,7 +27,7 @@ struct RestBreakView: View {
                     GeometryReader { proxy in
                         stage(t: t, size: proxy.size)
                     }
-                    .opacity(envelope(t, 0, total, fade: 0.9))
+                    .opacity(envelope(t, contentStart, total, fade: 0.9))
                 }
             }
         }
@@ -85,7 +80,7 @@ struct RestBreakView: View {
                     .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Text(verbatim: String(Int(remaining.rounded(.up))))
-                    .font(.system(size: 46, weight: .light, design: theme.fontDesign))
+                    .font(.system(size: 46, weight: .light, design: .monospaced))
                     .monospacedDigit()
                     .foregroundColor(.white)
             }
@@ -156,27 +151,15 @@ struct RestBreakView: View {
 
     // MARK: - Shared pieces
 
-    @ViewBuilder
     private func caption(_ text: String, local: Double, length: Double, size: CGFloat) -> some View {
-        let styled = theme.styled(text)
-        let font = Font.system(size: size, weight: theme == .aurora ? .regular : .medium, design: theme.fontDesign)
-        if theme.typesText {
-            TypedLine(
-                text: styled,
-                t: local,
-                eraseAt: length - TypedLine.erasingDuration(styled) - 0.35,
-                font: font,
-                color: theme == .matrix ? accent : .white,
-                cursor: theme == .matrix ? "█" : "_"
-            )
-            .shadow(color: Color.black.opacity(0.5), radius: 10)
-        } else {
-            Text(verbatim: styled)
-                .font(font)
-                .foregroundColor(.white)
-                .opacity(envelope(local, 0, length, fade: 0.7))
-                .shadow(color: Color.black.opacity(0.5), radius: 10)
-        }
+        let styled = text.lowercased()
+        return TypedLine(
+            text: styled,
+            t: local,
+            eraseAt: length - TypedLine.erasingDuration(styled) - 0.35,
+            font: .system(size: size, weight: .medium, design: .monospaced)
+        )
+        .shadow(color: Color.black.opacity(0.5), radius: 10)
     }
 
     private func progress(t: Double) -> some View {
@@ -203,7 +186,6 @@ struct RestBreakView: View {
 
 /// Lives in its own small window, the only part of a break that takes clicks.
 struct SkipButton: View {
-    let theme: Theme
     let action: () -> Void
 
     @State private var hovering = false
@@ -211,8 +193,8 @@ struct SkipButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(verbatim: theme == .aurora ? "Skip" : "skip")
-                .font(.system(size: 13, weight: .medium, design: theme.fontDesign))
+            Text(verbatim: "skip")
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundColor(Color.white.opacity(hovering ? 1 : 0.7))
                 .padding(.horizontal, 24)
                 .padding(.vertical, 8)

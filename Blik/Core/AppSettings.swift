@@ -25,10 +25,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    @Published var theme: Theme {
-        didSet { UserDefaults.standard.set(theme.rawValue, forKey: "theme") }
-    }
-
     @Published var dimScreen: Bool {
         didSet { UserDefaults.standard.set(dimScreen, forKey: "dimScreen") }
     }
@@ -43,7 +39,6 @@ final class AppSettings: ObservableObject {
         }
         enabled = storedEnabled
         minutes = storedMinutes
-        theme = Theme(rawValue: defaults.string(forKey: "theme") ?? "") ?? .keyboard
         dimScreen = defaults.object(forKey: "dimScreen") as? Bool ?? true
     }
 

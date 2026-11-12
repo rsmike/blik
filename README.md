@@ -18,20 +18,21 @@ and switch on "Launch at login" in the pop-up.
 
 - Reminders are full-screen, click-through overlays above everything, including full-screen apps.
   They never take keyboard focus. Only the "skip" pill during a rest break accepts clicks.
-- A blink reminder lasts 5 seconds. A posture reminder lasts one second: the same animation,
-  played quickly.
+- A blink reminder holds its message for 4 seconds, a posture reminder for 2. How a reminder
+  arrives and leaves takes the same time for both.
 - Reminders are held back while you are away from the keyboard (2+ minutes of no input).
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break also resets the blink and posture timers.
 - "Pause for today" lasts until 5 AM and survives a relaunch.
 
-## Styles
+## What a reminder looks like
 
-| Style    | What it does                                                                 |
-|----------|-------------------------------------------------------------------------------|
-| Keyboard | Screen dims, one word is typed in the centre, held, then backspaced away.      |
-| Matrix   | Digital rain over the whole screen, a terminal panel decodes the word.         |
-| Aurora   | Coloured light breathes in from the screen edges, the word drifts into focus.  |
+A drop of black liquid falls out of the notch and spreads into a small pill that types one word,
+holds it, backspaces it, then gathers itself and goes back up. Nothing is dimmed. For a rest
+break the drop falls to the middle of the screen and spreads into the dim.
+
+Reminders play on the display that has the notch. If no display has one (lid closed, older Mac),
+the drop comes out of the top edge of the primary display instead.
 
 ## Layout
 
@@ -42,13 +43,12 @@ Blik/
     ReminderKind.swift       the three reminders, texts, durations, rest timeline
     AppSettings.swift        persisted settings (UserDefaults)
     Scheduler.swift          when things fire: intervals, pause, idle and sleep handling
-    Theme.swift              the three styles
     Motion.swift             easing and timing helpers
   Overlay/
     OverlayController.swift  the overlay windows
     Glyphs.swift             animated eye, posture figure, water glass
   Scenes/
-    KeyboardScene.swift, MatrixScene.swift, AuroraScene.swift
+    NotchScene.swift         the liquid drop, the pill, how a rest break opens
     RestBreakView.swift      the long break
     TypedLine.swift          the typewriter effect
     ReminderScene.swift      picks the scene for a reminder
@@ -58,7 +58,7 @@ Blik/
 
 Every animation is a pure function of elapsed time (see `Motion.swift`), so tuning is a matter
 of changing numbers: durations in `ReminderKind.swift`, typing cadence in `TypedLine.swift`,
-rain density and speed in `MatrixScene.swift`.
+drop size and timing in `NotchScene.swift`.
 
 The project uses Xcode's folder-synchronised groups: any file added under `Blik/` is picked up
 automatically.
