@@ -9,15 +9,20 @@ struct KeyboardScene: View {
 
     @State private var start = Date()
 
-    private let fade: Double = 0.7
+    private var fade: Double { 0.7 * pace(duration) }
     private var text: String { kind.title.lowercased() + "." }
+
+    /// When backspacing starts, timed to finish just before the veil starts to lift.
+    /// A reminder too short to hold the word for a moment skips it and simply fades.
+    private var eraseAt: Double? {
+        let at = duration - 2 * fade - TypedLine.erasingDuration(text) - 0.25
+        return at - TypedLine.typingDuration(text) >= 0.6 ? at : nil
+    }
 
     var body: some View {
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSince(start)
             let strength = envelope(t, 0, duration, fade: fade)
-            // Finish backspacing just before the veil starts to lift.
-            let eraseAt = duration - 2 * fade - TypedLine.erasingDuration(text) - 0.25
             ZStack {
                 Color.black.opacity((dimmed ? 0.5 : 0) * strength)
                 if isPrimary {

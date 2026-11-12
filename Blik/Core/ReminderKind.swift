@@ -52,8 +52,8 @@ enum ReminderKind: String, CaseIterable, Identifiable {
     /// How long the reminder stays on screen, in seconds.
     var duration: TimeInterval {
         switch self {
-        case .blink: return 5.5
-        case .posture: return 6.5
+        case .blink: return 5
+        case .posture: return 1
         case .rest: return RestTimeline.total
         }
     }

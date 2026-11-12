@@ -13,7 +13,7 @@ struct MatrixScene: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
             let t = timeline.date.timeIntervalSince(start)
-            let strength = envelope(t, 0, duration, fade: 0.7)
+            let strength = envelope(t, 0, duration, fade: 0.7 * pace(duration))
             ZStack {
                 MatrixBackdrop(t: t, strength: strength, veil: dimmed ? 0.55 : 0)
                 if isPrimary {
@@ -105,8 +105,11 @@ struct MatrixPanel: View {
     private let bright = Color(red: 0.86, green: 1.0, blue: 0.90)
     private let barWidth: CGFloat = 426
 
+    /// All the panel's timings below are written for a 5 second reminder and scaled by this.
+    private var k: Double { pace(duration) }
+
     var body: some View {
-        let power = smooth((t - 0.4) / 0.35) * smooth((duration - 0.5 - t) / 0.3)
+        let power = smooth((t - 0.4 * k) / (0.35 * k)) * smooth((duration - 0.5 * k - t) / (0.3 * k))
         VStack(spacing: 0) {
             header
             Rectangle().fill(green.opacity(0.35)).frame(height: 1)
@@ -159,8 +162,8 @@ struct MatrixPanel: View {
 
     /// Letters resolve left to right, then dissolve back into noise before the panel powers off.
     private func isLocked(_ index: Int) -> Bool {
-        let lockAt = 0.95 + Double(index) * 0.12
-        let unlockAt = duration - 1.3 + Double(index) * 0.05
+        let lockAt = (0.95 + Double(index) * 0.07) * k
+        let unlockAt = duration - (1.3 - Double(index) * 0.05) * k
         return t >= lockAt && t < unlockAt
     }
 
@@ -172,7 +175,7 @@ struct MatrixPanel: View {
 
     private var hint: some View {
         let full = "> " + message.lowercased()
-        let count = max(0, min(full.count, Int((t - 1.7) * 34)))
+        let count = max(0, min(full.count, Int((t - 1.4 * k) * 70 / k)))
         let cursorOn = Int(t * 2.5) % 2 == 0
         let typed = String(full.prefix(count)) + (cursorOn ? "█" : "")
         return Text(verbatim: full + "█")
@@ -185,7 +188,7 @@ struct MatrixPanel: View {
     }
 
     private var timer: some View {
-        let remaining = clamp01(1 - (t - 1.0) / max(0.1, duration - 2.4))
+        let remaining = clamp01(1 - (t - 1.0 * k) / max(0.1, duration - 2.4 * k))
         return ZStack(alignment: .leading) {
             Rectangle()
                 .fill(green.opacity(0.18))

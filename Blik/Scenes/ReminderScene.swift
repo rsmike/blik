@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Root view of one full-screen overlay window. Picks the scene for the reminder and theme.
-/// Every screen gets the backdrop; only the primary screen (the one with the pointer) gets the content.
+/// Every screen gets the backdrop; only the primary display gets the content.
 struct ReminderScene: View {
     let kind: ReminderKind
     let theme: Theme

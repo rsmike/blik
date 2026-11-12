@@ -13,7 +13,7 @@ struct AuroraScene: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSince(start)
-            let strength = envelope(t, 0, duration, fade: 0.9)
+            let strength = envelope(t, 0, duration, fade: 0.9 * pace(duration))
             ZStack {
                 AuroraBackdrop(t: t, strength: strength, veil: dimmed ? 0.42 : 0)
                 if isPrimary {
@@ -26,8 +26,9 @@ struct AuroraScene: View {
 
     private func content(_ t: Double) -> some View {
         let letters = kind.word.map { String($0) }
-        let glyphIn = envelope(t, 0.3, duration - 0.7, fade: 0.7)
-        let messageIn = envelope(t, 1.3, duration - 0.9, fade: 0.7)
+        let k = pace(duration)
+        let glyphIn = envelope(t, 0.3 * k, duration - 0.7 * k, fade: 0.7 * k)
+        let messageIn = envelope(t, 1.3 * k, duration - 0.9 * k, fade: 0.7 * k)
         return VStack(spacing: 20) {
             KindGlyph(kind: kind, t: t, color: .white, size: 66)
                 .opacity(glyphIn)
@@ -47,8 +48,9 @@ struct AuroraScene: View {
 
     /// Each letter floats up into focus, then keeps rising as it blurs away.
     private func letter(_ value: String, index: Int, t: Double) -> some View {
-        let arrive = smooth((t - 0.5 - Double(index) * 0.07) / 0.65)
-        let leave = smooth((t - (duration - 1.5) - Double(index) * 0.045) / 0.55)
+        let k = pace(duration)
+        let arrive = smooth((t - (0.5 + Double(index) * 0.07) * k) / (0.65 * k))
+        let leave = smooth((t - duration + (1.5 - Double(index) * 0.045) * k) / (0.55 * k))
         let presence = arrive * (1 - leave)
         let offset = (1 - arrive) * 16 - leave * 16
         return Text(verbatim: value)

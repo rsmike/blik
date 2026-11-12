@@ -18,6 +18,12 @@ func envelope(_ t: Double, _ start: Double, _ end: Double, fade: Double = 0.6) -
     smooth((t - start) / fade) * smooth((end - t) / fade)
 }
 
+/// Time scale for a reminder's choreography. Scenes are composed for 5 seconds or more;
+/// a shorter reminder plays the same moves compressed evenly.
+func pace(_ duration: Double) -> Double {
+    min(1, duration / 5)
+}
+
 /// Deterministic pseudo-random value in 0..<1 for a pair of integers.
 func rnd(_ a: Int, _ b: Int) -> Double {
     var x = UInt64(truncatingIfNeeded: a) &* 0x9E37_79B9_7F4A_7C15

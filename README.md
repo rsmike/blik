@@ -18,6 +18,8 @@ and switch on "Launch at login" in the pop-up.
 
 - Reminders are full-screen, click-through overlays above everything, including full-screen apps.
   They never take keyboard focus. Only the "skip" pill during a rest break accepts clicks.
+- A blink reminder lasts 5 seconds. A posture reminder lasts one second: the same animation,
+  played quickly.
 - Reminders are held back while you are away from the keyboard (2+ minutes of no input).
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break also resets the blink and posture timers.

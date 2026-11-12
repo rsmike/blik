@@ -11,7 +11,7 @@ struct TypedLine: View {
     var color: Color = .white
     var cursor: String = "_"
 
-    static let eraseStep: Double = 0.045
+    static let eraseStep: Double = 0.025
 
     /// The moment each character lands, relative to the start of typing.
     static func typeTimes(_ chars: [Character]) -> [Double] {
@@ -19,8 +19,8 @@ struct TypedLine: View {
         var clock = 0.0
         for (index, char) in chars.enumerated() {
             if index > 0 {
-                clock += 0.065 + 0.075 * rnd(index, chars.count)
-                if char == "." || char == " " { clock += 0.07 }
+                clock += 0.03 + 0.04 * rnd(index, chars.count)
+                if char == "." || char == " " { clock += 0.035 }
             }
             times.append(clock)
         }
@@ -76,7 +76,7 @@ struct TypedLine: View {
                 ZStack {
                     if index < count {
                         let landed = index < state.shown
-                        let settle = landed ? smooth((t - state.times[index]) / 0.11) : 0
+                        let settle = landed ? smooth((t - state.times[index]) / 0.07) : 0
                         Text(String(state.chars[index]))
                             .opacity(settle)
                             .offset(y: CGFloat((1 - settle) * 3))
