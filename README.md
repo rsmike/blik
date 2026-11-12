@@ -124,7 +124,9 @@ Blik/
     TypedLine.swift          the typewriter effect
   Settings/
     SettingsView.swift       the pop-up
+  Assets.xcassets            the app icon
 scripts/release.sh           build, install, publish
+scripts/make-icon.swift      draws the app icon; run it again after changing the design
 packaging/blik.rb.template   the Homebrew cask, filled in by the release script
 ```
 
