@@ -16,6 +16,7 @@ struct BlikApp: App {
             // During a focus session the icon gives way to the countdown.
             if let remaining = focus.remaining {
                 Image(nsImage: MenuBarClock.image(FocusSession.clock(remaining)))
+                    .renderingMode(.original)
             } else {
                 Image(systemName: scheduler.isPaused ? "eye.slash" : "eye")
             }
@@ -24,22 +25,33 @@ struct BlikApp: App {
     }
 }
 
-/// The countdown as a menu bar image. Drawn rather than set as text so the digits are all
-/// the same width and the menu bar does not shuffle about every second.
+/// The countdown as a menu bar image: white digits on a red badge with a white rim, so a
+/// running session is hard to miss. The two colours cover for each other: over a light or dark
+/// menu bar the red stands out, and over a red or orange wallpaper the white rim and digits do.
+/// Drawn rather than set as text so the digits are all the same width and the menu bar does
+/// not shuffle about every second.
 enum MenuBarClock {
+    private static let red = NSColor(srgbRed: 0.90, green: 0.16, blue: 0.16, alpha: 1)
+    private static let rim: CGFloat = 1.5
+
     static func image(_ text: String) -> NSImage {
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-            .foregroundColor: NSColor.black
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12.5, weight: .bold),
+            .foregroundColor: NSColor.white
         ]
         let measured = (text as NSString).size(withAttributes: attributes)
-        let size = NSSize(width: ceil(measured.width), height: ceil(measured.height))
-        let image = NSImage(size: size, flipped: false) { _ in
-            (text as NSString).draw(at: .zero, withAttributes: attributes)
+        let size = NSSize(width: ceil(measured.width) + 16, height: 19)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.white.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+            red.setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: rim, dy: rim), xRadius: 6 - rim, yRadius: 6 - rim).fill()
+            let origin = NSPoint(x: (rect.width - measured.width) / 2, y: (rect.height - measured.height) / 2 + 0.5)
+            (text as NSString).draw(at: origin, withAttributes: attributes)
             return true
         }
-        // A template image takes the menu bar's own colour, light or dark.
-        image.isTemplate = true
+        // Not a template: the menu bar must leave its colours alone.
+        image.isTemplate = false
         return image
     }
 }

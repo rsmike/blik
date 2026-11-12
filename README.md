@@ -59,7 +59,8 @@ under "Focus" in the pop-up. A shortcut has to include Control or Command.
 
 - Starting and stopping each play a short chime and drop a toast from the notch ("focus on.",
   "focus off."). The session also stops by itself when the time is up.
-- While it runs, the menu bar icon is replaced by the time left (MM:SS).
+- While it runs, the menu bar icon is replaced by the time left (MM:SS): white digits on a red
+  badge with a white rim, so it stands out over any wallpaper, red ones included.
 - Blink and posture carry on. The rest break is held back, but its due time does not move:
   - it came due during the session: it shows as soon as the session ends, whether the time ran
     out or you stopped it;
