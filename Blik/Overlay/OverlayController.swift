@@ -28,8 +28,8 @@ final class OverlayController {
 
         let screens = NSScreen.screens
         guard !screens.isEmpty else { return }
-        let pointer = NSEvent.mouseLocation
-        let primary = screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main ?? screens[0]
+        // The system's primary display (the one set as main in Displays settings) is always first.
+        let primary = screens[0]
 
         let settings = AppSettings.shared
         let theme = settings.theme

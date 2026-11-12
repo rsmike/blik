@@ -21,7 +21,7 @@ and switch on "Launch at login" in the pop-up.
 - Reminders are held back while you are away from the keyboard (2+ minutes of no input).
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break also resets the blink and posture timers.
-- "Pause for today" lasts until midnight and survives a relaunch.
+- "Pause for today" lasts until 5 AM and survives a relaunch.
 
 ## Styles
 

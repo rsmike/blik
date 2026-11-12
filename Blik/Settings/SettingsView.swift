@@ -39,7 +39,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: "Blik")
                     .font(.system(size: 14, weight: .semibold))
-                Text(verbatim: scheduler.isPaused ? "Paused until tomorrow" : "Looking after your eyes")
+                Text(verbatim: scheduler.isPaused ? "Paused until 5 AM" : "Looking after your eyes")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

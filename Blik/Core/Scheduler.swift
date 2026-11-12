@@ -51,10 +51,16 @@ final class Scheduler: ObservableObject {
         return base.addingTimeInterval(settings.interval(kind))
     }
 
+    /// The hour at which "today" ends for the pause, so a late night still counts as the same day.
+    private static let dayEndsAtHour = 5
+
     func pauseForToday() {
-        let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86_400)
-        let until = calendar.startOfDay(for: tomorrow)
+        let now = Date()
+        let until = Calendar.current.nextDate(
+            after: now,
+            matching: DateComponents(hour: Self.dayEndsAtHour, minute: 0, second: 0),
+            matchingPolicy: .nextTime
+        ) ?? now.addingTimeInterval(86_400)
         pausedUntil = until
         UserDefaults.standard.set(until.timeIntervalSince1970, forKey: Self.pauseKey)
         OverlayController.shared.dismiss(animated: true)
