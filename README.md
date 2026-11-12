@@ -12,8 +12,30 @@ No Dock icon, no windows - only the pop-up under the eye icon.
 
 Requires macOS 14+. Signing is set to "Sign to Run Locally", so no developer account is needed.
 
-To keep it around: Product > Archive (or build Release), then copy `Blik.app` to `/Applications`
-and switch on "Launch at login" in the pop-up.
+To keep it around, install a Release build (see below) and switch on "Launch at login" in the
+pop-up.
+
+## Install and release
+
+With Homebrew, on an Apple silicon Mac:
+
+    brew install --cask rsmike/tap/blik
+
+From source, `scripts/release.sh` does the work:
+
+| Command                                | What it does                                              |
+|----------------------------------------|-----------------------------------------------------------|
+| `scripts/release.sh build [version]`   | Release build and a zip of it, in `build/`.               |
+| `scripts/release.sh install`           | Release build, copied to `/Applications` and launched.    |
+| `scripts/release.sh publish <version>` | Release build, GitHub release `v<version>` with the zip, and the Homebrew cask in `rsmike/homebrew-tap` updated to match. |
+
+`publish` wants a clean working tree that is already pushed, and needs the `gh` command signed
+in. The cask it writes comes from `packaging/blik.rb.template`.
+
+Blik is signed to run locally and is not notarized. A copy you build yourself opens normally.
+A downloaded copy is quarantined by macOS, so the cask removes the quarantine flag after
+installing; if you download the zip by hand, do the same with
+`xattr -dr com.apple.quarantine /Applications/Blik.app`.
 
 ## How it behaves
 
@@ -97,6 +119,8 @@ Blik/
     TypedLine.swift          the typewriter effect
   Settings/
     SettingsView.swift       the pop-up
+scripts/release.sh           build, install, publish
+packaging/blik.rb.template   the Homebrew cask, filled in by the release script
 ```
 
 Every animation is a pure function of elapsed time (see `Motion.swift`), so tuning is a matter
