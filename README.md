@@ -17,13 +17,16 @@ and switch on "Launch at login" in the pop-up.
 ## How it behaves
 
 - Reminders are full-screen, click-through overlays above everything, including full-screen apps.
-  They never take keyboard focus. Only the rest break's list and buttons accept clicks.
+  Blink and posture never take keyboard focus. A rest break does, for its keys, without
+  bringing Blik to the front; only its list and buttons accept clicks.
 - A blink reminder holds its message for 4 seconds, a posture reminder for 2. How a reminder
   arrives and leaves takes the same time for both.
 - Reminders are held back while you are away from the keyboard (2+ minutes of no input).
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break stays on screen until you press "done" or "snooze"; nothing else fires meanwhile.
   "done" restarts all intervals. "snooze" brings the break back in 5 minutes.
+- Rest break keys: Enter is "done", Esc is "snooze", Space picks a different activity. They are
+  ignored for the first two seconds, so typing already under way does not answer the break.
 - "Pause for today" lasts until 5 AM and survives a relaunch.
 
 ## What a reminder looks like

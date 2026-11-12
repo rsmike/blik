@@ -1,60 +1,95 @@
 import SwiftUI
 
-/// The rest break's to-do list and its two buttons. Lives in its own small window on top of the
-/// dim, the only part of a break that takes clicks. It stays until one of the buttons is pressed.
-struct RestCard: View {
+/// What a rest break's card shows and does. Shared with the card's window, whose keys drive it.
+@MainActor
+final class RestCardModel: ObservableObject {
+    let start = Date()
     /// Off-screen activities that have not been done today.
     let candidates: [String]
-    let onSnooze: () -> Void
-    /// Called with the activity that was on the list, if there was one.
-    let onDone: (String?) -> Void
 
-    static let size = CGSize(width: 460, height: 380)
+    @Published private(set) var activity: String?
+    @Published private(set) var rerolledAt: Date?
+    @Published private(set) var rerolls = 0
 
-    @State private var start = Date()
-    @State private var activity: String?
-    @State private var rerolledAt: Date?
-    @State private var rerolls = 0
-    @State private var settled = false
+    private let onSnooze: () -> Void
+    private let onDone: (String?) -> Void
 
+    /// Keys are ignored until the dim has covered the screen, so typing that was already under
+    /// way when the break began does not answer it by accident.
+    static let keysWakeAt = NotchRestBackdrop.covers + 0.25
+
+    /// `onDone` is called with the activity that was on the list, if there was one.
     init(candidates: [String], onSnooze: @escaping () -> Void, onDone: @escaping (String?) -> Void) {
         self.candidates = candidates
         self.onSnooze = onSnooze
         self.onDone = onDone
-        _activity = State(initialValue: candidates.randomElement())
+        activity = candidates.randomElement()
     }
+
+    var canReroll: Bool { candidates.count > 1 }
+
+    func snooze() {
+        onSnooze()
+    }
+
+    func done() {
+        onDone(activity)
+    }
+
+    /// Swaps the suggested activity for another one that is still open today.
+    func reroll() {
+        guard let next = candidates.filter({ $0 != activity }).randomElement() else { return }
+        activity = next
+        rerolledAt = Date()
+        rerolls += 1
+    }
+
+    /// A key pressed while the card has the keyboard: enter is done, space rerolls, esc snoozes.
+    func key(_ code: UInt16) {
+        guard Date().timeIntervalSince(start) >= Self.keysWakeAt else { return }
+        switch code {
+        case 36, 76: done()
+        case 49: reroll()
+        case 53: snooze()
+        default: break
+        }
+    }
+}
+
+/// The rest break's to-do list and its two buttons. Lives in its own small window on top of the
+/// dim, the only part of a break that takes clicks and keys. It stays until it is answered.
+struct RestCard: View {
+    @ObservedObject var model: RestCardModel
+
+    static let size = CGSize(width: 460, height: 380)
+
+    @State private var settled = false
 
     var body: some View {
         // The clock only runs while something is being typed.
         TimelineView(.animation(paused: settled)) { timeline in
             RestCardFace(
-                t: timeline.date.timeIntervalSince(start),
-                activity: activity,
-                activityT: rerolledAt.map { timeline.date.timeIntervalSince($0) },
-                canReroll: candidates.count > 1,
-                onReroll: reroll,
-                onSnooze: onSnooze,
-                onDone: { onDone(activity) }
+                t: timeline.date.timeIntervalSince(model.start),
+                activity: model.activity,
+                activityT: model.rerolledAt.map { timeline.date.timeIntervalSince($0) },
+                canReroll: model.canReroll,
+                onReroll: model.reroll,
+                onSnooze: model.snooze,
+                onDone: model.done
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: rerolls) {
+        .onChange(of: model.rerolls) {
+            settled = false
+        }
+        .task(id: model.rerolls) {
             // Long enough for the opening to finish, and for a rerolled activity to be typed.
-            let wait = max(2, RestCardFace.settlesAt - Date().timeIntervalSince(start))
+            let wait = max(2, RestCardFace.settlesAt - Date().timeIntervalSince(model.start))
             try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
             if !Task.isCancelled {
                 settled = true
             }
         }
-    }
-
-    /// Swaps the suggested activity for another one that is still open today.
-    private func reroll() {
-        guard let next = candidates.filter({ $0 != activity }).randomElement() else { return }
-        activity = next
-        rerolledAt = Date()
-        settled = false
-        rerolls += 1
     }
 }
 
@@ -112,13 +147,13 @@ struct RestCardFace: View {
                 }
             }
             HStack(spacing: 12) {
-                PillButton(title: "snooze 5 min", prominent: false, action: onSnooze)
-                PillButton(title: "done", prominent: true, action: onDone)
+                PillButton(title: "snooze 5 min", key: "esc", prominent: false, action: onSnooze)
+                PillButton(title: "done", key: "↵", prominent: true, action: onDone)
             }
             .opacity(smooth((t - Self.buttonsAt) / 0.5))
             .allowsHitTesting(t >= Self.buttonsAt)
         }
-        .frame(width: 250, alignment: .leading)
+        .frame(width: 290, alignment: .leading)
         .shadow(color: Color.black.opacity(0.5), radius: 10)
     }
 
@@ -146,10 +181,14 @@ struct RerollRow<Label: View>: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 label
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-                    .opacity(enabled ? (hovering ? 0.95 : 0.4) : 0)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(verbatim: "space")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                }
+                .foregroundColor(.white)
+                .opacity(enabled ? (hovering ? 0.95 : 0.4) : 0)
             }
             .contentShape(Rectangle())
         }
@@ -162,6 +201,8 @@ struct RerollRow<Label: View>: View {
 
 struct PillButton: View {
     let title: String
+    /// The key that does the same thing, shown as a hint.
+    let key: String
     /// The filled one is the button you are expected to press.
     let prominent: Bool
     let action: () -> Void
@@ -169,15 +210,20 @@ struct PillButton: View {
     @State private var hovering = false
 
     var body: some View {
+        let ink = prominent ? Color.black : Color.white.opacity(hovering ? 1 : 0.75)
         Button(action: action) {
-            Text(verbatim: title)
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
-                .foregroundColor(prominent ? .black : Color.white.opacity(hovering ? 1 : 0.75))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(Capsule().fill(Color.white.opacity(fill)))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(prominent ? 0 : 0.25), lineWidth: 1))
-                .contentShape(Capsule())
+            HStack(spacing: 8) {
+                Text(verbatim: title)
+                    .foregroundColor(ink)
+                Text(verbatim: key)
+                    .foregroundColor(ink.opacity(0.45))
+            }
+            .font(.system(size: 13, weight: .medium, design: .monospaced))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(Color.white.opacity(fill)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(prominent ? 0 : 0.25), lineWidth: 1))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

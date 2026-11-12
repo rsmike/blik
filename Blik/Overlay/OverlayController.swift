@@ -7,12 +7,33 @@ final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// The rest card's window. Unlike the other overlays it takes the keyboard, still without
+/// activating Blik, so that a break can be answered with a key. Every plain key press goes to
+/// `onKey` and nowhere else; shortcuts with Command are left to the system.
+final class KeyPanel: NSPanel {
+    var onKey: ((UInt16) -> Void)?
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, !event.modifierFlags.contains(.command) {
+            if !event.isARepeat {
+                onKey?(event.keyCode)
+            }
+            return
+        }
+        super.sendEvent(event)
+    }
+}
+
 /// Lets a button respond to the very first click even though Blik is never the active app.
 final class ClickableHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// Puts reminders on screen: one click-through, full-screen window per display.
+/// Puts reminders on screen: one click-through, full-screen window per display,
+/// plus the card of a rest break.
 @MainActor
 final class OverlayController {
     static let shared = OverlayController()
@@ -73,7 +94,7 @@ final class OverlayController {
             width: size.width,
             height: size.height
         )
-        let card = RestCard(
+        let model = RestCardModel(
             candidates: settings.activitiesLeftToday(),
             onSnooze: { Scheduler.shared.snoozeRest() },
             onDone: { activity in
@@ -83,13 +104,19 @@ final class OverlayController {
                 Scheduler.shared.finishRest()
             }
         )
-        let host = ClickableHostingView(rootView: card)
+        let host = ClickableHostingView(rootView: RestCard(model: model))
         host.sizingOptions = []
         let above = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
-        let panel = makePanel(frame: frame, clickThrough: false, level: above)
+        let panel = KeyPanel(contentRect: frame, styleMask: Self.panelStyle, backing: .buffered, defer: false)
+        configure(panel, clickThrough: false, level: above)
+        panel.onKey = { [weak model] code in
+            model?.key(code)
+        }
         panel.contentView = host
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
+        // Enter, space and esc answer the break, so the card takes the keyboard while it is up.
+        panel.makeKey()
         panels.append(panel)
     }
 
@@ -117,13 +144,15 @@ final class OverlayController {
         }
     }
 
+    private static let panelStyle: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+
     private func makePanel(frame: CGRect, clickThrough: Bool, level: NSWindow.Level) -> NSPanel {
-        let panel = OverlayPanel(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+        let panel = OverlayPanel(contentRect: frame, styleMask: Self.panelStyle, backing: .buffered, defer: false)
+        configure(panel, clickThrough: clickThrough, level: level)
+        return panel
+    }
+
+    private func configure(_ panel: NSPanel, clickThrough: Bool, level: NSWindow.Level) {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -135,7 +164,6 @@ final class OverlayController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.animationBehavior = .none
-        return panel
     }
 
     private func after(_ seconds: Double, _ work: @escaping @MainActor () -> Void) {
