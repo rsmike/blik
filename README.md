@@ -19,7 +19,12 @@ pop-up.
 
 With Homebrew, on an Apple silicon Mac:
 
+    brew tap rsmike/tap
+    brew trust --cask rsmike/tap/blik
     brew install --cask rsmike/tap/blik
+
+Homebrew will not load casks from a tap that is not its own until you trust them, hence the
+second line. Later, `brew upgrade --cask blik` picks up new releases.
 
 From source, `scripts/release.sh` does the work:
 

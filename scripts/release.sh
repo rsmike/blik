@@ -100,7 +100,7 @@ publish() {
         ${existing:+-f sha="$existing"} > /dev/null
 
     echo "Published $APP_NAME $version."
-    echo "Install:  brew install --cask ${TAP_REPO/homebrew-/}/blik"
+    echo "Install:  brew tap ${TAP_REPO/homebrew-/} && brew trust --cask ${TAP_REPO/homebrew-/}/blik && brew install --cask ${TAP_REPO/homebrew-/}/blik"
     echo "Update:   brew upgrade --cask blik"
 }
 

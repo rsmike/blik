@@ -8,14 +8,13 @@ cask "blik" do
   homepage "https://github.com/rsmike/blik"
 
   depends_on arch: :arm64
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Blik.app"
 
   # Blik is not notarized, so macOS would refuse to open the downloaded copy.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/Blik.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Blik.app"], must_succeed: false
   end
 
   uninstall quit: "com.rsmike.Blik"
