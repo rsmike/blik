@@ -25,8 +25,9 @@ and switch on "Launch at login" in the pop-up.
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break stays on screen until you press "done" or "snooze"; nothing else fires meanwhile.
   "done" restarts all intervals. "snooze" brings the break back in 5 minutes.
-- Rest break keys: Enter is "done", Esc is "snooze", Space picks a different activity. They are
-  ignored for the first two seconds, so typing already under way does not answer the break.
+- Rest break keys: Enter is "done", Esc is "snooze", Space picks a different activity, Delete
+  turns the activity down. They are ignored for the first two seconds, so typing already under
+  way does not answer the break.
 - "Pause for today" lasts until 5 AM and survives a relaunch.
 
 ## What a reminder looks like
@@ -41,6 +42,10 @@ to-do list types itself out: look far away, drink water, stretch, and one off-sc
   separated by commas). Click it to get a different one.
 - Pressing "done" counts the activity shown as done for today, and it is not offered again until
   the next day. Blik's day runs from 5 AM to 5 AM. Once every activity is done the line is left out.
+- To rest without doing the activity, click the cross next to it (or press Delete). The line
+  turns into "no activity", "done" then counts nothing, and the activity stays open for today.
+  Space brings an activity back. The same goes for a break you do not need at all: turn the
+  activity down and press "done".
 
 Reminders play on the display that has the notch. If no display has one (lid closed, older Mac),
 the drop comes out of the top edge of the primary display instead.

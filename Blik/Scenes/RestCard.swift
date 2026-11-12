@@ -8,8 +8,11 @@ final class RestCardModel: ObservableObject {
     let candidates: [String]
 
     @Published private(set) var activity: String?
-    @Published private(set) var rerolledAt: Date?
-    @Published private(set) var rerolls = 0
+    /// The suggested activity was turned down: it stays open for today, and "done" does not count it.
+    @Published private(set) var declined = false
+    /// When the activity line last changed, and how many times it has.
+    @Published private(set) var changedAt: Date?
+    @Published private(set) var changes = 0
 
     private let onSnooze: () -> Void
     private let onDone: (String?) -> Void
@@ -18,7 +21,7 @@ final class RestCardModel: ObservableObject {
     /// way when the break began does not answer it by accident.
     static let keysWakeAt = NotchRestBackdrop.covers + 0.25
 
-    /// `onDone` is called with the activity that was on the list, if there was one.
+    /// `onDone` is called with the activity that was done, if one was.
     init(candidates: [String], onSnooze: @escaping () -> Void, onDone: @escaping (String?) -> Void) {
         self.candidates = candidates
         self.onSnooze = onSnooze
@@ -26,37 +29,54 @@ final class RestCardModel: ObservableObject {
         activity = candidates.randomElement()
     }
 
-    var canReroll: Bool { candidates.count > 1 }
+    /// There is another activity to offer, or the one that was turned down can come back.
+    var canReroll: Bool { candidates.count > 1 || declined }
+    var canDecline: Bool { activity != nil && !declined }
 
     func snooze() {
         onSnooze()
     }
 
     func done() {
-        onDone(activity)
+        onDone(declined ? nil : activity)
     }
 
     /// Swaps the suggested activity for another one that is still open today.
+    /// After it was turned down, this brings an activity back.
     func reroll() {
-        guard let next = candidates.filter({ $0 != activity }).randomElement() else { return }
+        let others = candidates.filter { $0 != activity }
+        guard let next = others.randomElement() ?? (declined ? activity : nil) else { return }
         activity = next
-        rerolledAt = Date()
-        rerolls += 1
+        declined = false
+        lineChanged()
     }
 
-    /// A key pressed while the card has the keyboard: enter is done, space rerolls, esc snoozes.
+    /// Takes the activity off this break's list without crossing it off the day.
+    func decline() {
+        guard canDecline else { return }
+        declined = true
+        lineChanged()
+    }
+
+    private func lineChanged() {
+        changedAt = Date()
+        changes += 1
+    }
+
+    /// A key pressed while the card has the keyboard.
     func key(_ code: UInt16) {
         guard Date().timeIntervalSince(start) >= Self.keysWakeAt else { return }
         switch code {
-        case 36, 76: done()
-        case 49: reroll()
-        case 53: snooze()
+        case 36, 76: done()       // return, keypad enter
+        case 53: snooze()         // esc
+        case 49: reroll()         // space
+        case 51, 117: decline()   // delete, forward delete
         default: break
         }
     }
 }
 
-/// The rest break's to-do list and its two buttons. Lives in its own small window on top of the
+/// The rest break's to-do list and its buttons. Lives in its own small window on top of the
 /// dim, the only part of a break that takes clicks and keys. It stays until it is answered.
 struct RestCard: View {
     @ObservedObject var model: RestCardModel
@@ -71,19 +91,21 @@ struct RestCard: View {
             RestCardFace(
                 t: timeline.date.timeIntervalSince(model.start),
                 activity: model.activity,
-                activityT: model.rerolledAt.map { timeline.date.timeIntervalSince($0) },
+                declined: model.declined,
+                activityT: model.changedAt.map { timeline.date.timeIntervalSince($0) },
                 canReroll: model.canReroll,
                 onReroll: model.reroll,
+                onDecline: model.decline,
                 onSnooze: model.snooze,
                 onDone: model.done
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: model.rerolls) {
+        .onChange(of: model.changes) {
             settled = false
         }
-        .task(id: model.rerolls) {
-            // Long enough for the opening to finish, and for a rerolled activity to be typed.
+        .task(id: model.changes) {
+            // Long enough for the opening to finish, and for a changed activity line to be typed.
             let wait = max(2, RestCardFace.settlesAt - Date().timeIntervalSince(model.start))
             try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
             if !Task.isCancelled {
@@ -97,15 +119,19 @@ struct RestCard: View {
 struct RestCardFace: View {
     let t: Double
     let activity: String?
-    /// Seconds since the activity was swapped for another, if it has been.
+    let declined: Bool
+    /// Seconds since the activity line last changed, if it has.
     let activityT: Double?
     let canReroll: Bool
     let onReroll: () -> Void
+    let onDecline: () -> Void
     let onSnooze: () -> Void
     let onDone: () -> Void
 
     static let title = "rest."
     static let fixed = ["look far away", "drink water", "stretch"]
+    /// What the activity line says once the activity has been turned down.
+    static let noActivity = "no activity"
 
     /// The list starts typing once the drop has landed and begun to spread.
     static let opens = NotchRestBackdrop.lands + 0.4
@@ -137,12 +163,16 @@ struct RestCardFace: View {
                 }
                 if let activity = activity {
                     let local = activityT ?? t - Self.starts[Self.fixed.count + 1]
-                    let text = Self.entry(activity)
-                    RerollRow(
-                        enabled: canReroll && local > TypedLine.typingDuration(text),
-                        action: onReroll
+                    let text = Self.entry(declined ? Self.noActivity : activity)
+                    let typed = local > TypedLine.typingDuration(text)
+                    ActivityRow(
+                        canReroll: canReroll && typed,
+                        canDecline: !declined && typed,
+                        onReroll: onReroll,
+                        onDecline: onDecline
                     ) {
                         line(text, local: local, size: 19)
+                            .opacity(declined ? 0.45 : 1)
                     }
                 }
             }
@@ -169,33 +199,54 @@ struct RestCardFace: View {
     }
 }
 
-/// The suggested activity: click it for a different one.
-struct RerollRow<Label: View>: View {
-    let enabled: Bool
-    let action: () -> Void
+/// The suggested activity. Click it for a different one, or click the cross to turn it down.
+struct ActivityRow<Label: View>: View {
+    let canReroll: Bool
+    let canDecline: Bool
+    let onReroll: () -> Void
+    let onDecline: () -> Void
     @ViewBuilder var label: Label
 
-    @State private var hovering = false
+    @State private var overReroll = false
+    @State private var overDecline = false
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                label
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(verbatim: "space")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        HStack(spacing: 14) {
+            Button(action: onReroll) {
+                HStack(spacing: 4) {
+                    label
+                    hint("arrow.triangle.2.circlepath", key: "space", lit: overReroll)
+                        .opacity(canReroll ? 1 : 0)
                 }
-                .foregroundColor(.white)
-                .opacity(enabled ? (hovering ? 0.95 : 0.4) : 0)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .allowsHitTesting(canReroll)
+            .onHover { overReroll = $0 }
+            .help("Click for another")
+
+            Button(action: onDecline) {
+                hint("xmark", key: "del", lit: overDecline)
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(canDecline ? 1 : 0)
+            .allowsHitTesting(canDecline)
+            .onHover { overDecline = $0 }
+            .help("Not this time")
         }
-        .buttonStyle(.plain)
-        .allowsHitTesting(enabled)
-        .onHover { hovering = $0 }
-        .help("Click for another")
+    }
+
+    private func hint(_ symbol: String, key: String, lit: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+            Text(verbatim: key)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+        }
+        .foregroundColor(.white)
+        .opacity(lit ? 0.95 : 0.4)
     }
 }
 
