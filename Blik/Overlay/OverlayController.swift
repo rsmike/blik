@@ -56,35 +56,44 @@ final class OverlayController {
             panels.append(panel)
         }
 
-        if kind == .rest {
-            let size = CGSize(width: 160, height: 56)
-            let frame = CGRect(
-                x: primary.frame.midX - size.width / 2,
-                y: primary.visibleFrame.minY + 36,
-                width: size.width,
-                height: size.height
-            )
-            let button = SkipButton { [weak self] in
-                self?.dismiss(animated: true)
+        guard kind == .rest else {
+            // Quick reminders animate their own exit, so by now there is nothing left to see.
+            after(kind.duration) { [weak self] in
+                guard let self = self, self.token == current else { return }
+                self.dismiss(animated: false)
             }
-            let host = ClickableHostingView(rootView: button)
-            host.sizingOptions = []
-            let above = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
-            let panel = makePanel(frame: frame, clickThrough: false, level: above)
-            panel.contentView = host
-            panel.setFrame(frame, display: true)
-            panel.orderFrontRegardless()
-            panels.append(panel)
+            return
         }
 
-        // Scenes animate their own exit, so by now there is nothing left to see.
-        after(kind.duration) { [weak self] in
-            guard let self = self, self.token == current else { return }
-            self.dismiss(animated: false)
-        }
+        // A rest break stays until one of the buttons on its card is pressed.
+        let size = RestCard.size
+        let frame = CGRect(
+            x: primary.frame.midX - size.width / 2,
+            y: primary.frame.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        let card = RestCard(
+            candidates: settings.activitiesLeftToday(),
+            onSnooze: { Scheduler.shared.snoozeRest() },
+            onDone: { activity in
+                if let activity = activity {
+                    ActivityLog.markDone(activity)
+                }
+                Scheduler.shared.finishRest()
+            }
+        )
+        let host = ClickableHostingView(rootView: card)
+        host.sizingOptions = []
+        let above = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+        let panel = makePanel(frame: frame, clickThrough: false, level: above)
+        panel.contentView = host
+        panel.setFrame(frame, display: true)
+        panel.orderFrontRegardless()
+        panels.append(panel)
     }
 
-    /// Takes the current reminder down. Animated dismissal is for cutting one short (skip, pause).
+    /// Takes the current reminder down. Animated dismissal is for one that is on screen (done, snooze, pause).
     func dismiss(animated: Bool) {
         guard !panels.isEmpty else {
             isShowing = false

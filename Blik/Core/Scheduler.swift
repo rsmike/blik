@@ -51,16 +51,8 @@ final class Scheduler: ObservableObject {
         return base.addingTimeInterval(settings.interval(kind))
     }
 
-    /// The hour at which "today" ends for the pause, so a late night still counts as the same day.
-    private static let dayEndsAtHour = 5
-
     func pauseForToday() {
-        let now = Date()
-        let until = Calendar.current.nextDate(
-            after: now,
-            matching: DateComponents(hour: Self.dayEndsAtHour, minute: 0, second: 0),
-            matchingPolicy: .nextTime
-        ) ?? now.addingTimeInterval(86_400)
+        let until = Day.end(containing: Date())
         pausedUntil = until
         UserDefaults.standard.set(until.timeIntervalSince1970, forKey: Self.pauseKey)
         OverlayController.shared.dismiss(animated: true)
@@ -131,18 +123,43 @@ final class Scheduler: ObservableObject {
     private func fire(_ kind: ReminderKind, at now: Date) {
         var updated = lastFired
         updated[kind] = now
-        let clearAt = now.addingTimeInterval(kind.duration + 45)
-        for other in ReminderKind.allCases where other != kind {
-            if kind == .rest {
-                // A rest break covers the smaller reminders too.
-                updated[other] = now.addingTimeInterval(kind.duration)
-            } else if let due = nextFire(other), due < clearAt {
-                // Keep reminders from piling up back to back.
-                updated[other] = clearAt.addingTimeInterval(-settings.interval(other))
+        lastFired = updated
+        // A rest break stays up until it is dismissed, and nothing else fires while it is.
+        if kind != .rest {
+            holdOff(ReminderKind.allCases.filter { $0 != kind }, until: now.addingTimeInterval(kind.duration + 45))
+        }
+        OverlayController.shared.show(kind)
+    }
+
+    /// Keeps reminders from piling up back to back: none of `kinds` fires before `clearAt`.
+    private func holdOff(_ kinds: [ReminderKind], until clearAt: Date) {
+        var updated = lastFired
+        for kind in kinds {
+            if let due = nextFire(kind), due < clearAt {
+                updated[kind] = clearAt.addingTimeInterval(-settings.interval(kind))
             }
         }
         lastFired = updated
-        OverlayController.shared.show(kind)
+    }
+
+    // MARK: - Rest break buttons
+
+    private static let snooze: TimeInterval = 5 * 60
+
+    /// "done": the break is over, and every interval starts afresh.
+    func finishRest() {
+        OverlayController.shared.dismiss(animated: true)
+        resetAll()
+    }
+
+    /// "snooze": the break goes away and comes back in five minutes.
+    func snoozeRest() {
+        OverlayController.shared.dismiss(animated: true)
+        let now = Date()
+        var updated = lastFired
+        updated[.rest] = now.addingTimeInterval(Self.snooze - settings.interval(.rest))
+        lastFired = updated
+        holdOff([.blink, .posture], until: now.addingTimeInterval(45))
     }
 
     /// Seconds since the last keyboard or mouse input. Needs no permissions.

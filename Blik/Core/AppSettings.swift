@@ -29,6 +29,13 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(dimScreen, forKey: "dimScreen") }
     }
 
+    /// The off-screen activities a rest break can suggest, as typed: separated by commas or new lines.
+    @Published var activitiesText: String {
+        didSet { UserDefaults.standard.set(activitiesText, forKey: "activities") }
+    }
+
+    static let defaultActivities = "juggle, exercise, meditate, read, play jojo"
+
     private init() {
         let defaults = UserDefaults.standard
         var storedEnabled: [ReminderKind: Bool] = [:]
@@ -40,6 +47,21 @@ final class AppSettings: ObservableObject {
         enabled = storedEnabled
         minutes = storedMinutes
         dimScreen = defaults.object(forKey: "dimScreen") as? Bool ?? true
+        activitiesText = defaults.string(forKey: "activities") ?? Self.defaultActivities
+    }
+
+    /// The activity list, tidied up: trimmed, no blanks, no repeats.
+    var activities: [String] {
+        var seen = Set<String>()
+        return activitiesText
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+
+    /// The activities a rest break may still suggest today.
+    func activitiesLeftToday() -> [String] {
+        activities.filter { !ActivityLog.isDoneToday($0) }
     }
 
     func isEnabled(_ kind: ReminderKind) -> Bool {

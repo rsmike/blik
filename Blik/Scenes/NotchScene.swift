@@ -234,7 +234,6 @@ struct NotchRestBackdrop: View {
     let anchor: NotchAnchor
     let isPrimary: Bool
     let t: Double
-    let total: Double
     let veil: Double
 
     /// The moment the drop reaches the middle of the display, and the moment it has covered it.
@@ -242,10 +241,9 @@ struct NotchRestBackdrop: View {
     static let covers = 1.75
 
     var body: some View {
-        let leaving = smooth((total - t) / 0.9)
         let spread = clamp01((t - Self.lands) / (Self.covers - Self.lands))
         if !isPrimary || spread >= 1 {
-            Color.black.opacity(veil * smooth(spread) * leaving)
+            Color.black.opacity(veil * smooth(spread))
         } else {
             GeometryReader { proxy in
                 let size = proxy.size

@@ -21,7 +21,7 @@ enum ReminderKind: String, CaseIterable, Identifiable {
         switch self {
         case .blink: return "A quick nudge to blink"
         case .posture: return "Sit tall, shoulders back"
-        case .rest: return "Look away, eye gymnastics, water"
+        case .rest: return "Look away, water, stretch, something off-screen"
         }
     }
 
@@ -72,9 +72,10 @@ enum ReminderKind: String, CaseIterable, Identifiable {
         eraseAt + TypedLine.erasingDuration(typed) + 0.2
     }
 
-    /// How long the whole reminder stays on screen, in seconds.
+    /// How long a quick reminder stays on screen, in seconds.
+    /// A rest break has no length of its own: it stays until it is dismissed.
     var duration: TimeInterval {
-        self == .rest ? RestTimeline.total : typedTime + 2 * NotchDrop.lead
+        typedTime + 2 * NotchDrop.lead
     }
 
     var messages: [String] {
@@ -100,32 +101,5 @@ enum ReminderKind: String, CaseIterable, Identifiable {
 
     func randomMessage() -> String {
         messages.randomElement() ?? title
-    }
-}
-
-/// Timing of the full-screen rest break, in seconds.
-enum RestTimeline {
-    static let lookAway: Double = 20
-    static let gymnastics: Double = 26
-    static let drink: Double = 6
-    static let total: Double = lookAway + gymnastics + drink
-
-    /// Where the dot is, relative to the centre of the screen, `u` seconds into the exercise.
-    static func dotOffset(_ u: Double, ax: Double, ay: Double) -> CGPoint {
-        let turn = 2 * Double.pi
-        if u < 3 { return .zero }
-        if u < 11 {
-            return CGPoint(x: ax * sin(turn * (u - 3) / 4), y: 0)
-        }
-        if u < 19 {
-            return CGPoint(x: 0, y: -ay * sin(turn * (u - 11) / 4))
-        }
-        if u < 25.5 {
-            let v = u - 19
-            let radius = smooth(v / 1.0) * smooth((6.5 - v) / 1.0)
-            let angle = turn * v / 3.25
-            return CGPoint(x: ax * 0.8 * radius * sin(angle), y: -ay * radius * cos(angle))
-        }
-        return .zero
     }
 }

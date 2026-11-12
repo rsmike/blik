@@ -51,6 +51,22 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             optionRow("Dim screen during rest breaks", isOn: $settings.dimScreen)
             optionRow("Launch at login", isOn: launchBinding)
+            activitiesField
+        }
+    }
+
+    private var activitiesField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: "Off-screen activities")
+                .font(.system(size: 13))
+            TextField("juggle, read, meditate", text: $settings.activitiesText, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12))
+                .lineLimit(1...4)
+            Text(verbatim: "Separated by commas. A rest break suggests one you have not done today.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
