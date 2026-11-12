@@ -94,29 +94,48 @@ final class Scheduler: ObservableObject {
             return
         }
 
-        // Nobody is at the keyboard: hold everything. A long absence counts as a break.
-        let idle = idleSeconds()
-        if idle > 120 {
-            awayPeak = max(awayPeak, idle)
-            return
-        }
-        if awayPeak > 0 {
-            let wasLongBreak = awayPeak >= 300
+        let focusing = FocusSession.shared.isActive
+        if focusing {
+            // In a focus session the user is working, whether or not they touch the keyboard.
             awayPeak = 0
-            if wasLongBreak {
-                resetAll()
+        } else {
+            // Nobody is at the keyboard: hold everything. A long absence counts as a break.
+            let idle = idleSeconds(at: now)
+            if idle > 120 {
+                awayPeak = max(awayPeak, idle)
                 return
+            }
+            if awayPeak > 0 {
+                let wasLongBreak = awayPeak >= 300
+                awayPeak = 0
+                if wasLongBreak {
+                    resetAll()
+                    return
+                }
             }
         }
 
         if OverlayController.shared.isShowing { return }
 
+        var due: [ReminderKind: Date] = [:]
+        for kind in ReminderKind.allCases {
+            due[kind] = nextFire(kind)
+        }
+        if let kind = Self.pick(due: due, now: now, focusing: focusing) {
+            fire(kind, at: now)
+        }
+    }
+
+    /// Which reminder to fire now, if any: the rest break first, then posture, then blink.
+    /// A focus session holds the rest break back. Its due time does not move, so a break that
+    /// came due meanwhile shows as soon as the session ends, and one that did not still shows
+    /// in its own time.
+    nonisolated static func pick(due: [ReminderKind: Date], now: Date, focusing: Bool) -> ReminderKind? {
         let order: [ReminderKind] = [.rest, .posture, .blink]
-        for kind in order {
-            if let due = nextFire(kind), due <= now {
-                fire(kind, at: now)
-                break
-            }
+        return order.first { kind in
+            if kind == .rest && focusing { return false }
+            guard let at = due[kind] else { return false }
+            return at <= now
         }
     }
 
@@ -125,10 +144,24 @@ final class Scheduler: ObservableObject {
         updated[kind] = now
         lastFired = updated
         // A rest break stays up until it is dismissed, and nothing else fires while it is.
-        if kind != .rest {
-            holdOff(ReminderKind.allCases.filter { $0 != kind }, until: now.addingTimeInterval(kind.duration + 45))
+        if let toast = kind.toast {
+            holdOff(ReminderKind.allCases.filter { $0 != kind }, until: now.addingTimeInterval(toast.duration + 45))
         }
         OverlayController.shared.show(kind)
+    }
+
+    // MARK: - Focus sessions
+
+    /// A rest break was taken off the screen unanswered: it is due again straight away.
+    func restStillDue() {
+        var updated = lastFired
+        updated[.rest] = Date().addingTimeInterval(-settings.interval(.rest))
+        lastFired = updated
+    }
+
+    /// Keeps blink and posture clear of a toast that is not one of theirs.
+    func holdQuickReminders(until clearAt: Date) {
+        holdOff([.blink, .posture], until: clearAt)
     }
 
     /// Keeps reminders from piling up back to back: none of `kinds` fires before `clearAt`.
@@ -162,9 +195,12 @@ final class Scheduler: ObservableObject {
         holdOff([.blink, .posture], until: now.addingTimeInterval(45))
     }
 
-    /// Seconds since the last keyboard or mouse input. Needs no permissions.
-    private func idleSeconds() -> TimeInterval {
+    /// Seconds since the user was last known to be at the computer: the last keyboard or mouse
+    /// input (needs no permissions), or the end of a focus session if that was later.
+    private func idleSeconds(at now: Date) -> TimeInterval {
         guard let anyInput = CGEventType(rawValue: UInt32.max) else { return 0 }
-        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
+        let sinceInput = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
+        guard let focusEnded = FocusSession.shared.endedAt else { return sinceInput }
+        return min(sinceInput, now.timeIntervalSince(focusEnded))
     }
 }

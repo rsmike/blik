@@ -1,7 +1,8 @@
 # Blik
 
 A tiny macOS menu bar app that reminds you to blink, fix your posture and take a proper break
-(look away, water, stretch, something off-screen). No Dock icon, no windows - only the pop-up under the eye icon.
+(look away, water, stretch, something off-screen), with a simple focus timer built in.
+No Dock icon, no windows - only the pop-up under the eye icon.
 
 ## Run it
 
@@ -50,6 +51,26 @@ to-do list types itself out: look far away, drink water, stretch, and one off-sc
 Reminders play on the display that has the notch. If no display has one (lid closed, older Mac),
 the drop comes out of the top edge of the primary display instead.
 
+## Focus sessions
+
+A focus session is a countdown you start and stop with a system-wide shortcut (Control+Option+F
+unless you change it) or with the Start button in the pop-up. Set its length and the shortcut
+under "Focus" in the pop-up. A shortcut has to include Control or Command.
+
+- Starting and stopping each play a short chime and drop a toast from the notch ("focus on.",
+  "focus off."). The session also stops by itself when the time is up.
+- While it runs, the menu bar icon is replaced by the time left (MM:SS).
+- Blink and posture carry on. The rest break is held back, but its due time does not move:
+  - it came due during the session: it shows as soon as the session ends, whether the time ran
+    out or you stopped it;
+  - it is not due yet when the session ends: it shows in its own time.
+- A rest break that is already on screen when you start a session is taken down and comes back
+  when the session ends.
+- During a session you are taken to be at the computer even without touching it, so reading
+  for twenty minutes does not count as being away.
+- Toasts never overlap. One that arrives while another is playing waits for it to finish, so
+  "focus off." is followed by the rest break, not covered by it.
+
 ## Layout
 
 ```
@@ -58,7 +79,11 @@ Blik/
   Core/
     ReminderKind.swift       the three reminders, texts, durations
     AppSettings.swift        persisted settings (UserDefaults)
-    Scheduler.swift          when things fire: intervals, pause, snooze, idle and sleep handling
+    Scheduler.swift          when things fire: intervals, pause, snooze, focus, idle and sleep handling
+    Focus.swift              the focus session and its countdown
+    HotKey.swift             the system-wide shortcut
+    Chime.swift              the start and stop sounds, synthesised
+    Toast.swift              what a notch toast says and how long it stays
     Day.swift                the 5 AM day boundary, which activities were done today
     Motion.swift             easing and timing helpers
   Overlay/
@@ -69,7 +94,6 @@ Blik/
     RestBreakView.swift      the dim behind a rest break
     RestCard.swift           the rest break's to-do list, reroll, snooze and done
     TypedLine.swift          the typewriter effect
-    ReminderScene.swift      picks the scene for a reminder
   Settings/
     SettingsView.swift       the pop-up
 ```

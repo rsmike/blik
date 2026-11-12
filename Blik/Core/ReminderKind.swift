@@ -49,33 +49,14 @@ enum ReminderKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// What a quick reminder types out.
-    var typed: String { title.lowercased() + "." }
-
-    /// How long the finished message of a quick reminder is held, in seconds. The only timing
-    /// that differs between them: how a reminder arrives and leaves is the same for every kind.
-    var messageTime: TimeInterval {
+    /// The toast of a quick reminder: its word, held for 4 seconds (blink) or 2 (posture).
+    /// A rest break has none; it has a screen of its own that stays until it is dismissed.
+    var toast: ToastSpec? {
         switch self {
-        case .blink: return 4
-        case .posture: return 2
-        case .rest: return 0
+        case .blink: return ToastSpec(icon: .glyph(self), text: "blink.", hold: 4)
+        case .posture: return ToastSpec(icon: .glyph(self), text: "posture.", hold: 2)
+        case .rest: return nil
         }
-    }
-
-    /// When backspacing starts, counted from the first keystroke.
-    var eraseAt: TimeInterval {
-        TypedLine.typingDuration(typed) + messageTime
-    }
-
-    /// First keystroke to last backspace, plus a beat of bare cursor.
-    var typedTime: TimeInterval {
-        eraseAt + TypedLine.erasingDuration(typed) + 0.2
-    }
-
-    /// How long a quick reminder stays on screen, in seconds.
-    /// A rest break has no length of its own: it stays until it is dismissed.
-    var duration: TimeInterval {
-        typedTime + 2 * NotchDrop.lead
     }
 
     var messages: [String] {

@@ -32,65 +32,81 @@ final class ClickableHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// Puts reminders on screen: one click-through, full-screen window per display,
-/// plus the card of a rest break.
+/// Puts things on screen: a toast on the display with the notch, or a rest break on all of them.
 @MainActor
 final class OverlayController {
     static let shared = OverlayController()
 
-    private(set) var isShowing = false
+    private enum Showing {
+        case toast, rest
+    }
+
+    private var showing: Showing?
     private var panels: [NSPanel] = []
     private var token = 0
+    /// A toast that arrived while another was playing. Toasts never overlap: it plays next.
+    private var waiting: ToastSpec?
 
     private init() {}
 
+    /// Something is on screen, or about to be.
+    var isShowing: Bool { showing != nil || waiting != nil }
+    var isShowingRest: Bool { showing == .rest }
+
     func show(_ kind: ReminderKind) {
-        dismiss(animated: false)
+        if let toast = kind.toast {
+            show(toast)
+        } else {
+            showRest()
+        }
+    }
 
-        let screens = NSScreen.screens
-        guard !screens.isEmpty else { return }
-        let settings = AppSettings.shared
-
-        // Reminders drop from the notch, so the content goes on the display that has one. Failing
-        // that, on the system primary display (the one set as main in Displays settings, always first).
-        let primary = screens.first(where: NotchAnchor.hasNotch) ?? screens[0]
-        // A quick reminder lives on its own display and never dims anything.
-        let toast = kind != .rest
+    /// Plays a toast. One that arrives while another is playing waits for it to finish;
+    /// one that arrives during a rest break takes the break down.
+    func show(_ toast: ToastSpec) {
+        if showing == .toast {
+            waiting = toast
+            return
+        }
+        takeDown(animated: true)
+        guard let stage = stage else { return }
 
         token += 1
         let current = token
-        isShowing = true
+        showing = .toast
+        addOverlay(NotchScene(spec: toast, anchor: NotchAnchor(screen: stage)), on: stage)
 
-        for screen in toast ? [primary] : screens {
-            let scene = ReminderScene(
-                kind: kind,
-                dimmed: settings.dimScreen && !toast,
-                isPrimary: screen === primary,
+        // A toast animates its own exit, so by now there is nothing left to see.
+        after(toast.duration) { [weak self] in
+            guard let self = self, self.token == current else { return }
+            self.takeDown(animated: false)
+            self.playWaiting()
+        }
+    }
+
+    /// A rest break: the dim on every display, and the card on the one with the notch.
+    /// It stays until one of the buttons on the card is pressed.
+    private func showRest() {
+        waiting = nil
+        takeDown(animated: false)
+        guard let stage = stage else { return }
+        let settings = AppSettings.shared
+
+        token += 1
+        showing = .rest
+        for screen in NSScreen.screens {
+            let dim = RestBreakView(
+                dimmed: settings.dimScreen,
+                isPrimary: screen === stage,
                 anchor: NotchAnchor(screen: screen)
             )
-            let host = NSHostingView(rootView: scene)
-            host.sizingOptions = []
-            let panel = makePanel(frame: screen.frame, clickThrough: true, level: .screenSaver)
-            panel.contentView = host
-            panel.setFrame(screen.frame, display: true)
-            panel.orderFrontRegardless()
-            panels.append(panel)
+            addOverlay(dim, on: screen)
         }
 
-        guard kind == .rest else {
-            // Quick reminders animate their own exit, so by now there is nothing left to see.
-            after(kind.duration) { [weak self] in
-                guard let self = self, self.token == current else { return }
-                self.dismiss(animated: false)
-            }
-            return
-        }
-
-        // A rest break stays until one of the buttons on its card is pressed.
         let size = RestCard.size
         let frame = CGRect(
-            x: primary.frame.midX - size.width / 2,
-            y: primary.frame.midY - size.height / 2,
+            x: stage.frame.midX - size.width / 2,
+            y: stage.frame.midY - size.height / 2,
             width: size.width,
             height: size.height
         )
@@ -120,16 +136,24 @@ final class OverlayController {
         panels.append(panel)
     }
 
-    /// Takes the current reminder down. Animated dismissal is for one that is on screen (done, snooze, pause).
+    /// Takes down whatever is on screen (done, snooze, pause). A toast that was waiting plays now.
     func dismiss(animated: Bool) {
-        guard !panels.isEmpty else {
-            isShowing = false
-            return
-        }
+        takeDown(animated: animated)
+        playWaiting()
+    }
+
+    private func playWaiting() {
+        guard let next = waiting else { return }
+        waiting = nil
+        show(next)
+    }
+
+    private func takeDown(animated: Bool) {
+        showing = nil
+        guard !panels.isEmpty else { return }
         token += 1
         let closing = panels
         panels = []
-        isShowing = false
 
         guard animated else {
             closing.forEach { $0.orderOut(nil) }
@@ -144,13 +168,26 @@ final class OverlayController {
         }
     }
 
-    private static let panelStyle: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
-
-    private func makePanel(frame: CGRect, clickThrough: Bool, level: NSWindow.Level) -> NSPanel {
-        let panel = OverlayPanel(contentRect: frame, styleMask: Self.panelStyle, backing: .buffered, defer: false)
-        configure(panel, clickThrough: clickThrough, level: level)
-        return panel
+    /// Toasts drop from the notch, so the content goes on the display that has one. Failing that,
+    /// on the system's primary display (the one set as main in Displays settings, always first).
+    private var stage: NSScreen? {
+        let screens = NSScreen.screens
+        return screens.first(where: NotchAnchor.hasNotch) ?? screens.first
     }
+
+    /// A click-through, full-screen window on one display.
+    private func addOverlay<Content: View>(_ view: Content, on screen: NSScreen) {
+        let host = NSHostingView(rootView: view)
+        host.sizingOptions = []
+        let panel = OverlayPanel(contentRect: screen.frame, styleMask: Self.panelStyle, backing: .buffered, defer: false)
+        configure(panel, clickThrough: true, level: .screenSaver)
+        panel.contentView = host
+        panel.setFrame(screen.frame, display: true)
+        panel.orderFrontRegardless()
+        panels.append(panel)
+    }
+
+    private static let panelStyle: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
 
     private func configure(_ panel: NSPanel, clickThrough: Bool, level: NSWindow.Level) {
         panel.isOpaque = false

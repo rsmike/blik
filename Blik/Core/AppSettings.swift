@@ -36,6 +36,22 @@ final class AppSettings: ObservableObject {
 
     static let defaultActivities = "juggle, exercise, meditate, read, play jojo"
 
+    /// Length of a focus session, in minutes.
+    @Published var focusMinutes: Int {
+        didSet { UserDefaults.standard.set(focusMinutes, forKey: "focusMinutes") }
+    }
+
+    static let focusOptions = [10, 15, 20, 25, 30, 45, 50, 60, 90]
+
+    /// The system-wide shortcut that starts and stops a focus session; nil for none.
+    @Published var focusHotKey: HotKeyCombo? {
+        didSet {
+            // An empty entry means "none", as opposed to never having been set.
+            UserDefaults.standard.set(focusHotKey?.stored ?? [:], forKey: "focusHotKey")
+            HotKey.shared.bind(focusHotKey)
+        }
+    }
+
     private init() {
         let defaults = UserDefaults.standard
         var storedEnabled: [ReminderKind: Bool] = [:]
@@ -48,6 +64,12 @@ final class AppSettings: ObservableObject {
         minutes = storedMinutes
         dimScreen = defaults.object(forKey: "dimScreen") as? Bool ?? true
         activitiesText = defaults.string(forKey: "activities") ?? Self.defaultActivities
+        focusMinutes = defaults.object(forKey: "focusMinutes") as? Int ?? 25
+        if let stored = defaults.dictionary(forKey: "focusHotKey") {
+            focusHotKey = HotKeyCombo(stored: stored)
+        } else {
+            focusHotKey = .standard
+        }
     }
 
     /// The activity list, tidied up: trimmed, no blanks, no repeats.

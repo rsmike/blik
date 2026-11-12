@@ -153,39 +153,48 @@ enum NotchDrop {
     }
 }
 
-/// A quick reminder: a drop of black liquid falls out of the notch and spreads into a small pill
-/// that types the reminder, then gathers itself and goes back up. Nothing is dimmed.
+/// A toast: a drop of black liquid falls out of the notch and spreads into a small pill
+/// that types a word, then gathers itself and goes back up. Nothing is dimmed.
 struct NotchScene: View {
-    let kind: ReminderKind
+    let spec: ToastSpec
     let anchor: NotchAnchor
-    let isPrimary: Bool
-    let duration: Double
 
     @State private var start = Date()
 
     var body: some View {
         TimelineView(.animation) { timeline in
-            if isPrimary {
-                NotchToast(kind: kind, anchor: anchor, t: timeline.date.timeIntervalSince(start), duration: duration)
-            }
+            NotchToast(spec: spec, anchor: anchor, t: timeline.date.timeIntervalSince(start))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
     }
 }
 
 /// One frame of the toast, `t` seconds in.
 struct NotchToast: View {
-    let kind: ReminderKind
+    let spec: ToastSpec
     let anchor: NotchAnchor
     let t: Double
-    let duration: Double
 
     private static let fontSize: CGFloat = 15
     private static let glyphSize: CGFloat = 22
     private static let padding: CGFloat = 17
     private static let spacing: CGFloat = 9
 
-    private var text: String { kind.typed }
+    private var text: String { spec.text }
+    private var duration: Double { spec.duration }
+
+    @ViewBuilder
+    private var icon: some View {
+        switch spec.icon {
+        case .glyph(let kind):
+            KindGlyph(kind: kind, t: t, color: .white, size: Self.glyphSize)
+        case .symbol(let name):
+            Image(systemName: name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
 
     private var pill: CGSize {
         // Monospaced: every character, and the cursor after them, is 0.6 em wide.
@@ -212,13 +221,13 @@ struct NotchToast: View {
                 .frame(width: canvas.width, height: canvas.height)
                 .position(x: anchor.rect.midX, y: canvas.height / 2)
             HStack(spacing: Self.spacing) {
-                KindGlyph(kind: kind, t: t, color: .white, size: Self.glyphSize)
+                icon
                     .frame(width: Self.glyphSize, height: Self.glyphSize)
                 // Typing starts once the pill is open and is backspaced before it closes.
                 TypedLine(
                     text: text,
                     t: t - NotchDrop.lead,
-                    eraseAt: kind.eraseAt,
+                    eraseAt: spec.eraseAt,
                     font: .system(size: Self.fontSize, weight: .medium, design: .monospaced)
                 )
             }

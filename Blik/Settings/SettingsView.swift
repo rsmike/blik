@@ -18,6 +18,8 @@ struct SettingsView: View {
                 }
             }
             Divider()
+            FocusSection()
+            Divider()
             options
             Divider()
             footer
@@ -123,11 +125,142 @@ struct SettingsView: View {
     }
 }
 
+/// The focus session: its length, a button to start and stop it, and its system-wide shortcut.
+private struct FocusSection: View {
+    @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var focus: FocusSession
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "timer")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.primary.opacity(0.08))
+                    )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: "Focus")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(verbatim: focus.remaining.map { FocusSession.clock($0) + " left" } ?? "Holds the rest break back")
+                        .font(.system(size: 11))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 4)
+
+                Picker("Session length", selection: $settings.focusMinutes) {
+                    ForEach(AppSettings.focusOptions, id: \.self) { value in
+                        Text(verbatim: "\(value) min").tag(value)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+                .disabled(focus.isActive)
+
+                Button(focus.isActive ? "Stop" : "Start") {
+                    focus.toggle()
+                }
+                .controlSize(.small)
+            }
+
+            HStack {
+                Text(verbatim: "Start / stop shortcut")
+                    .font(.system(size: 13))
+                Spacer()
+                HotKeyRecorder()
+            }
+        }
+    }
+}
+
+/// Shows the focus shortcut. Click it, then press the new one. Esc cancels.
+private struct HotKeyRecorder: View {
+    @EnvironmentObject private var settings: AppSettings
+    @ObservedObject private var hotKey = HotKey.shared
+
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if hotKey.refused && !recording {
+                Text(verbatim: "in use")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .help("The system would not register this shortcut. Something else may be using it.")
+            }
+            Button {
+                if recording {
+                    stop()
+                } else {
+                    begin()
+                }
+            } label: {
+                Text(verbatim: recording ? "Press keys…" : settings.focusHotKey?.label ?? "None")
+                    .frame(minWidth: 64)
+            }
+            .controlSize(.small)
+            .help("Click, then press a shortcut that includes Control or Command")
+
+            if settings.focusHotKey != nil && !recording {
+                Button {
+                    settings.focusHotKey = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Remove the shortcut")
+            }
+        }
+        .onDisappear(perform: stop)
+    }
+
+    private func begin() {
+        recording = true
+        // Let go of the current shortcut so that pressing it again records it instead of firing it.
+        HotKey.shared.release()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                stop()
+            } else if let combo = HotKeyCombo(event: event) {
+                stopListening()
+                settings.focusHotKey = combo
+            } else {
+                NSSound.beep()
+            }
+            return nil
+        }
+    }
+
+    /// Ends recording and puts the shortcut that is set back in force.
+    private func stop() {
+        guard recording else { return }
+        stopListening()
+        HotKey.shared.bind(settings.focusHotKey)
+    }
+
+    private func stopListening() {
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        monitor = nil
+        recording = false
+    }
+}
+
 private struct ReminderRow: View {
     let kind: ReminderKind
 
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var scheduler: Scheduler
+    @EnvironmentObject private var focus: FocusSession
 
     var body: some View {
         let isOn = settings.isEnabled(kind)
@@ -199,6 +332,10 @@ private struct ReminderRow: View {
     private func status(at date: Date) -> String {
         guard settings.isEnabled(kind) else { return "Off" }
         guard let due = scheduler.nextFire(kind) else { return "Paused" }
+        // A focus session holds the rest break back until it ends.
+        if kind == .rest, let focusEnds = focus.endsAt, due <= focusEnds {
+            return "After focus"
+        }
         let seconds = max(0, Int(due.timeIntervalSince(date).rounded()))
         if seconds == 0 { return "Any moment" }
         let minutes = seconds / 60
