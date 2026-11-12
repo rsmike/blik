@@ -49,12 +49,13 @@ enum ReminderKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The toast of a quick reminder: its word, held for 4 seconds (blink) or 2 (posture).
-    /// A rest break has none; it has a screen of its own that stays until it is dismissed.
+    /// The toast of a quick reminder: its word, in a pill that is open for 3 seconds (blink)
+    /// or 1.5 (posture). A rest break has none; it has a screen of its own that stays until it
+    /// is dismissed.
     var toast: ToastSpec? {
         switch self {
-        case .blink: return ToastSpec(icon: .glyph(self), text: "blink.", hold: 4)
-        case .posture: return ToastSpec(icon: .glyph(self), text: "posture.", hold: 2)
+        case .blink: return ToastSpec(icon: .glyph(self), text: "blink.", open: 3, dims: true)
+        case .posture: return ToastSpec(icon: .glyph(self), text: "posture.", open: 1.5, dims: true)
         case .rest: return nil
         }
     }

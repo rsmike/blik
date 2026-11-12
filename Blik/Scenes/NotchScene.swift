@@ -153,8 +153,31 @@ enum NotchDrop {
     }
 }
 
+/// The dim that goes with a reminder toast. It covers every display, because the toast itself
+/// plays on one. It shares the toast's two ends but is quicker than the drop: it comes down as
+/// the drop starts to appear, so it is in place before the pill has opened, and it lifts late,
+/// reaching nothing just as the drop is gone.
+struct ToastDim: View {
+    /// How long the toast it accompanies stays on screen.
+    let duration: Double
+
+    @State private var start = Date()
+
+    static let strength = 0.5
+    /// Seconds the dim takes to come down, and to lift.
+    static let fade = 0.5
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSince(start)
+            Color.black.opacity(Self.strength * envelope(t, 0, duration, fade: Self.fade))
+        }
+        .ignoresSafeArea()
+    }
+}
+
 /// A toast: a drop of black liquid falls out of the notch and spreads into a small pill
-/// that types a word, then gathers itself and goes back up. Nothing is dimmed.
+/// that types a word, then gathers itself and goes back up.
 struct NotchScene: View {
     let spec: ToastSpec
     let anchor: NotchAnchor

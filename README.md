@@ -47,8 +47,9 @@ installing; if you download the zip by hand, do the same with
 - Reminders are full-screen, click-through overlays above everything, including full-screen apps.
   Blink and posture never take keyboard focus. A rest break does, for its keys, without
   bringing Blik to the front; only its list and buttons accept clicks.
-- A blink reminder holds its message for 4 seconds, a posture reminder for 2. How a reminder
-  arrives and leaves takes the same time for both.
+- A blink reminder's pill is open for 3 seconds, a posture reminder's for 1.5: that covers
+  typing the word, holding it and backspacing it. How a reminder arrives and leaves takes the
+  same time for both, a little over a second each way.
 - Reminders are held back while you are away from the keyboard (2+ minutes of no input).
   An absence of 5+ minutes, or the Mac sleeping, restarts all intervals.
 - A rest break stays on screen until you press "done" or "snooze"; nothing else fires meanwhile.
@@ -61,7 +62,12 @@ installing; if you download the zip by hand, do the same with
 ## What a reminder looks like
 
 A drop of black liquid falls out of the notch and spreads into a small pill that types one word,
-holds it, backspaces it, then gathers itself and goes back up. Nothing is dimmed.
+holds it, backspaces it, then gathers itself and goes back up. For blink and posture every
+display dims along with it, so the reminder is noticed even when you are looking at another
+screen: the dim comes down in half a second as the drop appears, and lifts in the last half
+second as the drop goes back up.
+The focus toasts do not dim. "Dim screen during reminders" in the pop-up turns the dim off, for these and for
+the rest break.
 
 For a rest break the drop falls to the middle of the screen and spreads into the dim, and a short
 to-do list types itself out: look far away, drink water, stretch, and one off-screen activity.

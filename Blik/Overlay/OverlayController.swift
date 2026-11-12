@@ -32,7 +32,8 @@ final class ClickableHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-/// Puts things on screen: a toast on the display with the notch, or a rest break on all of them.
+/// Puts things on screen: a toast on the display with the notch, with a dim on every display
+/// if it is a reminder, or a rest break on all of them.
 @MainActor
 final class OverlayController {
     static let shared = OverlayController()
@@ -74,6 +75,11 @@ final class OverlayController {
         token += 1
         let current = token
         showing = .toast
+        if toast.dims && AppSettings.shared.dimScreen {
+            for screen in NSScreen.screens {
+                addOverlay(ToastDim(duration: toast.duration), on: screen)
+            }
+        }
         addOverlay(NotchScene(spec: toast, anchor: NotchAnchor(screen: stage)), on: stage)
 
         // A toast animates its own exit, so by now there is nothing left to see.

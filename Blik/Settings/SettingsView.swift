@@ -51,7 +51,7 @@ struct SettingsView: View {
 
     private var options: some View {
         VStack(alignment: .leading, spacing: 10) {
-            optionRow("Dim screen during rest breaks", isOn: $settings.dimScreen)
+            optionRow("Dim screen during reminders", isOn: $settings.dimScreen)
             optionRow("Launch at login", isOn: launchBinding)
             activitiesField
         }
